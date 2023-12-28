@@ -2,7 +2,7 @@
 This module takes care of starting the API Server, Loading the DB and Adding the endpoints
 """
 import os
-from flask import Flask, request, jsonify, url_for
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from datastructures import FamilyStructure
@@ -28,14 +28,25 @@ def sitemap():
 @app.route('/members', methods=['GET'])
 def handle_hello():
 
-    # this is how you can use the Family datastructure by calling its methods
+ 
     members = jackson_family.get_all_members()
-    response_body = {
-        "family": members
-    }
-
+    response_body = {"family": members}
 
     return jsonify(response_body), 200
+
+@app.route("/members/<int:member_id>", methods=["PUT"])
+def handle_update_member(member_id):
+    json_data = request.get_json()
+    result = jackson_family.update_member(member_id, json_data)
+    return jsonify(result), 200
+
+@app.route('/members/<int:member_id>', methods=['GET'])
+def handle_get_one_member(member_id):
+   member = jackson_family.get_member(member_id)
+   if member is None:
+       return jsonify({"msg": "no family member with this ID"}), 404
+   return jsonify(member), 200
+    
 
 @app.route('/members', methods=["POST"])
 def handle_add_member():
@@ -44,6 +55,10 @@ def handle_add_member():
     for key in required_keys:
         if key not in json_data:
             return f"missing {key} key form request body", 400
+    
+    if not isinstance(json_data["age"], int):
+        return "age isn't an integer!", 400
+
     new_member = {
         "first_name": json_data["first_name"],
         "age": json_data["age"],
@@ -51,7 +66,18 @@ def handle_add_member():
     }
     
     inner_member_data = jackson_family.add_member(new_member)
-    return jsonify(inner_member_data), 201
+    return jsonify(inner_member_data), 200
+
+@app.route('/members/<int:member_id>', methods=['DELETE'])
+def handle_delete_member (member_id):
+    member = jackson_family.get_member(member_id)
+    if member is None:
+       return jsonify({"msg": "no family member with this ID"}), 404
+    jackson_family.delete_member(member_id)
+    response_body = {
+        "done": True
+    }
+    return jsonify(response_body), 200
 
 # this only runs if `$ python src/app.py` is executed
 if __name__ == '__main__':
